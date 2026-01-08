@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q, Count
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
 
 from accounts.permissions import IsNotBanned, IsSuperUser
 from problems.models import Problem, ProblemSolveStatus
@@ -28,6 +29,18 @@ class SubmissionCreateView(views.APIView):
     }
     """
     permission_classes = [IsAuthenticated, IsNotBanned]
+    serializer_class = SubmissionCreateSerializer  # Added for Swagger
+    
+    @extend_schema(
+        request=SubmissionCreateSerializer,
+        responses={
+            201: SubmissionDetailSerializer,
+            400: OpenApiResponse(description='Bad Request'),
+            404: OpenApiResponse(description='Problem Not Found'),
+        },
+        description='Submit code for a problem. The code will be executed against all test cases.',
+        summary='Submit Code Solution'
+    )
     
     def post(self, request):
         serializer = SubmissionCreateSerializer(data=request.data)
@@ -204,6 +217,39 @@ class SubmissionListView(generics.ListAPIView):
     serializer_class = SubmissionListSerializer
     permission_classes = [IsAuthenticated]
     
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name='problem_slug',
+                description='Filter by problem slug',
+                required=False,
+                type=str
+            ),
+            OpenApiParameter(
+                name='verdict',
+                description='Filter by verdict (ACCEPTED, WRONG_ANSWER, etc.)',
+                required=False,
+                type=str
+            ),
+            OpenApiParameter(
+                name='language',
+                description='Filter by programming language',
+                required=False,
+                type=str
+            ),
+            OpenApiParameter(
+                name='username',
+                description='Filter by username',
+                required=False,
+                type=str
+            ),
+        ],
+        description='List all submissions with optional filters',
+        summary='List Submissions'
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+    
     def get_queryset(self):
         queryset = Submission.objects.select_related('user', 'problem')
         
@@ -267,7 +313,13 @@ class MySubmissionStatsView(views.APIView):
     GET /api/submissions/my-stats/
     """
     permission_classes = [IsAuthenticated, IsNotBanned]
+    serializer_class = SubmissionStatsSerializer  # Added for Swagger
     
+    @extend_schema(
+        responses={200: SubmissionStatsSerializer},
+        description='Get submission statistics for the current user',
+        summary='Get User Submission Statistics'
+    )
     def get(self, request):
         user = request.user
         submissions = Submission.objects.filter(user=user)
