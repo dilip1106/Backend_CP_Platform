@@ -1,0 +1,10 @@
+venv
+.env
+__pycache__
+.venv
+# Django migrations
+*/migrations/*
+!*/migrations/__init__.py
+*.json
+# *.md
+*.yml
