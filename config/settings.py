@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     # Local apps
     'accounts',
     'problems',
+    'submissions',
 ]
 
 MIDDLEWARE = [
