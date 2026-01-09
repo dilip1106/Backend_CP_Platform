@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from drf_spectacular.utils import extend_schema_field
 from .models import Submission, TestCaseResult
 from problems.models import Problem
 
@@ -46,13 +47,15 @@ class TestCaseResultSerializer(serializers.ModelSerializer):
             'error_message'
         ]
     
-    def get_input_data(self, obj):
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_input_data(self, obj) -> str:
         """Show input only for sample test cases"""
         if obj.test_case.test_type == 'SAMPLE':
             return obj.test_case.input_data
         return None
     
-    def get_expected_output(self, obj):
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_expected_output(self, obj) -> str:
         """Show expected output only for sample test cases"""
         if obj.test_case.test_type == 'SAMPLE':
             return obj.test_case.expected_output
@@ -66,7 +69,7 @@ class SubmissionListSerializer(serializers.ModelSerializer):
     problem_title = serializers.CharField(source='problem.title', read_only=True)
     problem_slug = serializers.CharField(source='problem.slug', read_only=True)
     username = serializers.CharField(source='user.username', read_only=True)
-    pass_percentage = serializers.ReadOnlyField()
+    pass_percentage = serializers.SerializerMethodField()
     
     class Meta:
         model = Submission
@@ -76,28 +79,46 @@ class SubmissionListSerializer(serializers.ModelSerializer):
             'test_cases_passed', 'total_test_cases', 'pass_percentage',
             'submitted_at'
         ]
+    
+    @extend_schema_field(serializers.FloatField())
+    def get_pass_percentage(self, obj) -> float:
+        """Get submission pass percentage"""
+        return obj.pass_percentage
 
 
 class SubmissionDetailSerializer(serializers.ModelSerializer):
-    """
-    Serializer for submission detail view
-    """
     problem_title = serializers.CharField(source='problem.title', read_only=True)
     problem_slug = serializers.CharField(source='problem.slug', read_only=True)
     username = serializers.CharField(source='user.username', read_only=True)
     test_case_results = TestCaseResultSerializer(many=True, read_only=True)
-    pass_percentage = serializers.ReadOnlyField()
-    
+    pass_percentage = serializers.SerializerMethodField()
+
     class Meta:
         model = Submission
         fields = [
             'id', 'problem_title', 'problem_slug', 'username',
-            'code', 'language', 'verdict', 
+            'code', 'language', 'verdict',
             'execution_time', 'memory_used',
             'test_cases_passed', 'total_test_cases', 'pass_percentage',
             'error_message', 'compilation_output',
             'test_case_results', 'submitted_at'
         ]
+
+    @extend_schema_field(serializers.FloatField())
+    def get_pass_percentage(self, obj) -> float:
+        return obj.pass_percentage
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get("request")
+
+        # If not owner → hide sensitive fields
+        if not request or request.user != instance.user:
+            data.pop("code", None)
+            data.pop("error_message", None)
+            data.pop("compilation_output", None)
+
+        return data
 
 
 class UserSubmissionSerializer(serializers.ModelSerializer):
@@ -106,7 +127,7 @@ class UserSubmissionSerializer(serializers.ModelSerializer):
     """
     problem_title = serializers.CharField(source='problem.title', read_only=True)
     problem_slug = serializers.CharField(source='problem.slug', read_only=True)
-    pass_percentage = serializers.ReadOnlyField()
+    pass_percentage = serializers.SerializerMethodField()
     
     class Meta:
         model = Submission
@@ -118,6 +139,11 @@ class UserSubmissionSerializer(serializers.ModelSerializer):
             'error_message', 'compilation_output',
             'submitted_at'
         ]
+    
+    @extend_schema_field(serializers.FloatField())
+    def get_pass_percentage(self, obj) -> float:
+        """Get submission pass percentage"""
+        return obj.pass_percentage
 
 
 class SubmissionStatsSerializer(serializers.Serializer):

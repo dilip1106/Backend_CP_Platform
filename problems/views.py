@@ -2,6 +2,7 @@ from rest_framework import generics, status, views
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db.models import Q
+from drf_spectacular.utils import extend_schema
 from accounts.permissions import IsSuperUser, IsSuperUserOrReadOnly, IsNotBanned
 
 from .models import Problem, TestCase, Tag, ProblemSolveStatus
@@ -10,10 +11,10 @@ from .serializers import (
     ProblemDetailSerializer,
     ProblemCreateSerializer,
     ProblemUpdateSerializer,
+    ProblemStatisticsSerializer,
     TagSerializer,
     TestCaseSerializer,
     TestCaseCreateSerializer,
-    ProblemStatisticsSerializer
 )
 
 
@@ -127,6 +128,7 @@ class ProblemDeleteView(generics.DestroyAPIView):
     DELETE /api/problems/<slug>/delete/
     """
     queryset = Problem.objects.all()
+    serializer_class = ProblemUpdateSerializer
     permission_classes = [IsSuperUser]
     lookup_field = 'slug'
     
@@ -188,10 +190,11 @@ class TestCaseUpdateView(generics.UpdateAPIView):
 
 class TestCaseDeleteView(generics.DestroyAPIView):
     """
-    Delete a test case (SuperUser only)
+    Delete a test case (SuperUser only) - soft delete
     DELETE /api/problems/test-cases/<id>/delete/
     """
     queryset = TestCase.objects.all()
+    serializer_class = TestCaseSerializer
     permission_classes = [IsSuperUser]
     
     def perform_destroy(self, instance):
@@ -213,13 +216,19 @@ class ProblemStatisticsView(generics.RetrieveAPIView):
     lookup_field = 'slug'
 
 
-class UserProblemStatsView(views.APIView):
+class UserProblemStatsView(generics.GenericAPIView):
     """
     Get current user's problem solving statistics
     GET /api/problems/my-stats/
     """
     permission_classes = [IsAuthenticated, IsNotBanned]
+    serializer_class = ProblemStatisticsSerializer
     
+    @extend_schema(
+        responses=ProblemStatisticsSerializer,
+        description='Get problem solving statistics for the current user',
+        summary='Get User Problem Statistics'
+    )
     def get(self, request):
         user = request.user
         

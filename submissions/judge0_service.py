@@ -53,7 +53,7 @@ class Judge0Service:
         language: str,
         stdin: str = '',
         expected_output: str = '',
-        time_limit: float = 2.0,
+        time_limit: float = 20.0,
         memory_limit: int = 256000
     ) -> Optional[str]:
         """

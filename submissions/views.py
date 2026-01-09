@@ -109,29 +109,60 @@ class SubmissionCreateView(views.APIView):
             # Parse result
             parsed = judge0.parse_result(result)
             
-            # Update test case result
-            tc_result.actual_output = parsed['stdout'].strip()
-            tc_result.execution_time = int((parsed['execution_time'] or 0) * 1000)  # Convert to ms
-            tc_result.memory_used = parsed['memory_used'] or 0
-            tc_result.error_message = parsed['stderr'] or parsed['message']
+            # Update test case result - safely handle None values
+            stdout = parsed.get('stdout')
+            tc_result.actual_output = stdout.strip() if stdout else ''
+            
+            # Safely convert execution_time to integer (in milliseconds)
+            try:
+                exec_time = parsed.get('execution_time')
+                if exec_time is not None:
+                    # Handle both string and float types
+                    if isinstance(exec_time, str):
+                        exec_time = float(exec_time.strip())
+                    tc_result.execution_time = int(float(exec_time) * 1000)  # Convert to ms
+                else:
+                    tc_result.execution_time = 0
+            except (ValueError, TypeError):
+                tc_result.execution_time = 0
+            
+            # Safely convert memory_used to integer
+            try:
+                memory = parsed.get('memory_used')
+                if memory is not None:
+                    if isinstance(memory, str):
+                        memory = float(memory.strip())
+                    tc_result.memory_used = int(float(memory))
+                else:
+                    tc_result.memory_used = 0
+            except (ValueError, TypeError):
+                tc_result.memory_used = 0
+            
+            # Safely get stderr and message
+            stderr = parsed.get('stderr')
+            message = parsed.get('message')
+            tc_result.error_message = (stderr if stderr else '') or (message if message else '')
             
             # Determine status
-            if parsed['verdict'] == 'ACCEPTED':
+            verdict = parsed.get('verdict', 'INTERNAL_ERROR')
+            
+            if verdict == 'ACCEPTED':
                 tc_result.status = TestCaseResult.Status.ACCEPTED
                 submission.test_cases_passed += 1
-            elif parsed['verdict'] == 'WRONG_ANSWER':
+            elif verdict == 'WRONG_ANSWER':
                 tc_result.status = TestCaseResult.Status.WRONG_ANSWER
                 all_passed = False
-            elif parsed['verdict'] == 'TIME_LIMIT_EXCEEDED':
+            elif verdict == 'TIME_LIMIT_EXCEEDED':
                 tc_result.status = TestCaseResult.Status.TIME_LIMIT_EXCEEDED
                 all_passed = False
-            elif parsed['verdict'] == 'RUNTIME_ERROR':
+            elif verdict == 'RUNTIME_ERROR':
                 tc_result.status = TestCaseResult.Status.RUNTIME_ERROR
                 all_passed = False
-            elif parsed['verdict'] == 'COMPILATION_ERROR':
+            elif verdict == 'COMPILATION_ERROR':
                 # Compilation error affects the whole submission
                 submission.verdict = Submission.Verdict.COMPILATION_ERROR
-                submission.compilation_output = parsed['compile_output']
+                compile_output = parsed.get('compile_output')
+                submission.compilation_output = compile_output if compile_output else ''
                 submission.save()
                 tc_result.status = TestCaseResult.Status.RUNTIME_ERROR
                 tc_result.error_message = "Compilation error"
@@ -141,14 +172,14 @@ class SubmissionCreateView(views.APIView):
             tc_result.save()
             
             # Track max time and memory
-            if tc_result.execution_time:
-                max_time = max(max_time, tc_result.execution_time)
-            if tc_result.memory_used:
-                max_memory = max(max_memory, tc_result.memory_used)
+            if tc_result.execution_time and tc_result.execution_time > max_time:
+                max_time = tc_result.execution_time
+            if tc_result.memory_used and tc_result.memory_used > max_memory:
+                max_memory = tc_result.memory_used
         
         # Update submission verdict
         if submission.verdict != Submission.Verdict.COMPILATION_ERROR:
-            if all_passed:
+            if all_passed and submission.test_cases_passed > 0:
                 submission.verdict = Submission.Verdict.ACCEPTED
             else:
                 # Find the first failure to determine verdict
@@ -163,9 +194,11 @@ class SubmissionCreateView(views.APIView):
                         submission.verdict = Submission.Verdict.TIME_LIMIT_EXCEEDED
                     elif first_failure.status == TestCaseResult.Status.RUNTIME_ERROR:
                         submission.verdict = Submission.Verdict.RUNTIME_ERROR
+                else:
+                    submission.verdict = Submission.Verdict.INTERNAL_ERROR
         
-        submission.execution_time = max_time
-        submission.memory_used = max_memory
+        submission.execution_time = max_time if max_time > 0 else None
+        submission.memory_used = max_memory if max_memory > 0 else None
         submission.save()
         
         # Update problem statistics
@@ -279,11 +312,12 @@ class SubmissionListView(generics.ListAPIView):
 class SubmissionDetailView(generics.RetrieveAPIView):
     """
     Get submission details
-    GET /api/submissions/<id>/
+    GET /api/submissions/<pk>/
     """
     queryset = Submission.objects.all()
     serializer_class = SubmissionDetailSerializer
     permission_classes = [IsAuthenticated]
+    lookup_field = 'pk'
     
     def get_serializer_class(self):
         """Use UserSubmissionSerializer if viewing own submission"""

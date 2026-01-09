@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from drf_spectacular.utils import extend_schema_field
 from .models import Problem, TestCase, Tag, ProblemSolveStatus
 from django.utils.text import slugify
 
@@ -41,7 +42,7 @@ class ProblemListSerializer(serializers.ModelSerializer):
     Serializer for problem listing (brief view)
     """
     tags = TagSerializer(many=True, read_only=True)
-    acceptance_rate = serializers.ReadOnlyField()
+    acceptance_rate = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
     
     class Meta:
@@ -52,7 +53,13 @@ class ProblemListSerializer(serializers.ModelSerializer):
             'status', 'created_at'
         ]
     
-    def get_status(self, obj):
+    @extend_schema_field(serializers.FloatField())
+    def get_acceptance_rate(self, obj) -> float:
+        """Get problem acceptance rate"""
+        return obj.acceptance_rate
+    
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_status(self, obj) -> str:
         """Get user's solve status for this problem"""
         request = self.context.get('request')
         if request and request.user.is_authenticated:
@@ -70,7 +77,7 @@ class ProblemDetailSerializer(serializers.ModelSerializer):
     """
     tags = TagSerializer(many=True, read_only=True)
     sample_test_cases = serializers.SerializerMethodField()
-    acceptance_rate = serializers.ReadOnlyField()
+    acceptance_rate = serializers.SerializerMethodField()
     created_by_username = serializers.CharField(source='created_by.username', read_only=True)
     status = serializers.SerializerMethodField()
     
@@ -85,11 +92,18 @@ class ProblemDetailSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
     
+    @extend_schema_field(TestCaseSerializer(many=True))
     def get_sample_test_cases(self, obj):
         """Get only sample (visible) test cases"""
         sample_cases = obj.test_cases.filter(test_type='SAMPLE', is_active=True)
         return TestCaseSerializer(sample_cases, many=True).data
     
+    @extend_schema_field(serializers.FloatField())
+    def get_acceptance_rate(self, obj) -> float:
+        """Get problem acceptance rate"""
+        return obj.acceptance_rate
+    
+    @extend_schema_field(serializers.JSONField(allow_null=True))
     def get_status(self, obj):
         """Get user's solve status"""
         request = self.context.get('request')
@@ -187,7 +201,7 @@ class ProblemStatisticsSerializer(serializers.ModelSerializer):
     """
     Serializer for problem statistics
     """
-    acceptance_rate = serializers.ReadOnlyField()
+    acceptance_rate = serializers.SerializerMethodField()
     
     class Meta:
         model = Problem
@@ -195,3 +209,8 @@ class ProblemStatisticsSerializer(serializers.ModelSerializer):
             'id', 'title', 'total_submissions', 'accepted_submissions',
             'acceptance_rate', 'total_solved'
         ]
+    
+    @extend_schema_field(serializers.FloatField())
+    def get_acceptance_rate(self, obj) -> float:
+        """Get problem acceptance rate"""
+        return obj.acceptance_rate
