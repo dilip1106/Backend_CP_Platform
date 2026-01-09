@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     UserRegistrationView,
@@ -30,4 +30,7 @@ urlpatterns = [
     path('users/<int:pk>/', UserDetailView.as_view(), name='user-detail'),
     path('users/<int:pk>/change-role/', ChangeUserRoleView.as_view(), name='change-role'),
     path('users/<int:pk>/<str:action>/', BanUserView.as_view(), name='ban-user'),
+    
+    # Progress & Stats (Phase 4)
+    path('users/', include('accounts.progress_urls')),
 ]

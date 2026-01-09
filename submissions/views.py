@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q, Count
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
+from django.shortcuts import get_object_or_404
 
 from accounts.permissions import IsNotBanned, IsSuperUser
 from problems.models import Problem, ProblemSolveStatus
@@ -315,16 +316,9 @@ class SubmissionDetailView(generics.RetrieveAPIView):
     GET /api/submissions/<pk>/
     """
     queryset = Submission.objects.all()
-    serializer_class = SubmissionDetailSerializer
+    serializer_class = SubmissionDetailSerializer  # Use single serializer
     permission_classes = [IsAuthenticated]
     lookup_field = 'pk'
-    
-    def get_serializer_class(self):
-        """Use UserSubmissionSerializer if viewing own submission"""
-        submission = self.get_object()
-        if self.request.user == submission.user:
-            return UserSubmissionSerializer
-        return SubmissionDetailSerializer
 
 
 class MySubmissionsView(generics.ListAPIView):

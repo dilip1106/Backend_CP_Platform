@@ -118,3 +118,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         self.is_banned = False
         self.is_active = True
         self.save(update_fields=['is_banned', 'is_active'])
+
+
+# Import additional models
+from .additional_models import UserActivity, Achievement, UserAchievement

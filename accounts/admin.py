@@ -40,3 +40,6 @@ class UserAdmin(BaseUserAdmin):
         if not request.user.is_superuser and obj:
             readonly.append('role')
         return readonly
+
+# Import additional admin
+from .additional_admin import *

@@ -26,7 +26,9 @@ INSTALLED_APPS = [
     # Local apps
     'accounts',
     'problems',
-    'submissions',
+    # 'submissions',
+    'submissions.apps.SubmissionsConfig', 
+    'achievements',
 ]
 
 MIDDLEWARE = [
