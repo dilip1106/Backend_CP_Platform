@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import extend_schema, OpenApiResponse
 
 from accounts.permissions import IsSuperUser, IsNotBanned, IsManager
 from .models import Contest, ContestRegistration, ContestAnnouncement
@@ -96,6 +97,7 @@ class ContestDeleteView(generics.DestroyAPIView):
     DELETE /api/contests/<slug>/delete/
     """
     queryset = Contest.objects.all()
+    serializer_class = ContestDetailSerializer  # Added for Swagger
     permission_classes = [IsSuperUser]
     lookup_field = 'slug'
     
@@ -127,6 +129,10 @@ class AssignManagerView(views.APIView):
     """
     permission_classes = [IsSuperUser]
     
+    @extend_schema(
+        request={'application/json': {'type': 'object', 'properties': {'manager_id': {'type': 'integer'}}}},
+        responses={200: ContestDetailSerializer}
+    )
     def post(self, request, slug):
         contest = get_object_or_404(Contest, slug=slug)
         manager_id = request.data.get('manager_id')
@@ -167,6 +173,10 @@ class RemoveManagerView(views.APIView):
     """
     permission_classes = [IsSuperUser]
     
+    @extend_schema(
+        request=None,
+        responses={200: ContestDetailSerializer}
+    )
     def post(self, request, slug):
         contest = get_object_or_404(Contest, slug=slug)
         contest.manager = None
@@ -187,6 +197,10 @@ class RegisterForContestView(views.APIView):
     """
     permission_classes = [IsAuthenticated, IsNotBanned]
     
+    @extend_schema(
+        request=None,
+        responses={201: ContestRegistrationSerializer, 400: OpenApiResponse(description='Bad Request')}
+    )
     def post(self, request, slug):
         contest = get_object_or_404(Contest, slug=slug, is_active=True)
         
@@ -235,6 +249,10 @@ class UnregisterFromContestView(views.APIView):
     """
     permission_classes = [IsAuthenticated, IsNotBanned]
     
+    @extend_schema(
+        request=None,
+        responses={200: OpenApiResponse(description='Successfully unregistered')}
+    )
     def post(self, request, slug):
         contest = get_object_or_404(Contest, slug=slug)
         

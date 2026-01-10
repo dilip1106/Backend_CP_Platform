@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.utils.text import slugify
 from django.contrib.auth import get_user_model
+from drf_spectacular.utils import extend_schema_field
 from .models import Contest, ContestRegistration, ContestAnnouncement
 
 User = get_user_model()
@@ -10,7 +11,7 @@ class ContestListSerializer(serializers.ModelSerializer):
     """
     Serializer for contest listing (brief view)
     """
-    status = serializers.ReadOnlyField()
+    status = serializers.SerializerMethodField()
     manager_username = serializers.CharField(source='manager.username', read_only=True)
     is_registered = serializers.SerializerMethodField()
     
@@ -23,6 +24,11 @@ class ContestListSerializer(serializers.ModelSerializer):
             'is_registered', 'created_at'
         ]
     
+    @extend_schema_field(serializers.CharField)
+    def get_status(self, obj):
+        return obj.status
+    
+    @extend_schema_field(serializers.BooleanField)
     def get_is_registered(self, obj):
         """Check if current user is registered"""
         request = self.context.get('request')
@@ -38,11 +44,11 @@ class ContestDetailSerializer(serializers.ModelSerializer):
     """
     Serializer for contest detail view
     """
-    status = serializers.ReadOnlyField()
-    is_upcoming = serializers.ReadOnlyField()
-    is_running = serializers.ReadOnlyField()
-    is_ended = serializers.ReadOnlyField()
-    can_register = serializers.ReadOnlyField()
+    status = serializers.SerializerMethodField()
+    is_upcoming = serializers.SerializerMethodField()
+    is_running = serializers.SerializerMethodField()
+    is_ended = serializers.SerializerMethodField()
+    can_register = serializers.SerializerMethodField()
     
     manager_username = serializers.CharField(source='manager.username', read_only=True, allow_null=True)
     created_by_username = serializers.CharField(source='created_by.username', read_only=True)
@@ -63,6 +69,27 @@ class ContestDetailSerializer(serializers.ModelSerializer):
             'is_registered', 'created_at', 'updated_at'
         ]
     
+    @extend_schema_field(serializers.CharField)
+    def get_status(self, obj):
+        return obj.status
+    
+    @extend_schema_field(serializers.BooleanField)
+    def get_is_upcoming(self, obj):
+        return obj.is_upcoming
+    
+    @extend_schema_field(serializers.BooleanField)
+    def get_is_running(self, obj):
+        return obj.is_running
+    
+    @extend_schema_field(serializers.BooleanField)
+    def get_is_ended(self, obj):
+        return obj.is_ended
+    
+    @extend_schema_field(serializers.BooleanField)
+    def get_can_register(self, obj):
+        return obj.can_register
+    
+    @extend_schema_field(serializers.BooleanField)
     def get_is_registered(self, obj):
         """Check if current user is registered"""
         request = self.context.get('request')
@@ -73,6 +100,7 @@ class ContestDetailSerializer(serializers.ModelSerializer):
             ).exists()
         return False
     
+    @extend_schema_field(serializers.DictField)
     def get_time_info(self, obj):
         """Get time-related information"""
         info = {}

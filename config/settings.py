@@ -148,6 +148,9 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'API documentation for LeetCode Clone platform',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    'ENUM_NAME_OVERRIDES': {
+        'StatusFaaEnum': 'contests.contest_submission_models.ProblemSolveStatus.Status',
+    },
 }
 
 # Email Configuration

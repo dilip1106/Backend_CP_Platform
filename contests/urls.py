@@ -26,6 +26,35 @@ from .views import (
     MyManagedContestsView,
 )
 
+from .contest_problem_views import (
+    # Contest Problems
+    ContestProblemsListView,
+    ContestProblemDetailView,
+    ContestProblemCreateView,
+    ContestProblemUpdateView,
+    ContestProblemDeleteView,
+    ReorderProblemsView,
+    
+    # Test Cases
+    ContestProblemTestCasesView,
+    ContestTestCaseCreateView,
+    ContestTestCaseUpdateView,
+    ContestTestCaseDeleteView,
+    
+    # Statistics
+    ContestProblemStatsView,
+)
+
+from .contest_participation_views import (
+    # Contest Participation
+    SubmitContestSolutionView,
+    ContestLeaderboardView,
+    DetailedLeaderboardView,
+    MyContestDashboardView,
+    MyContestSubmissionsView,
+    ContestSubmissionDetailView,
+)
+
 app_name = 'contests'
 
 urlpatterns = [
@@ -53,4 +82,27 @@ urlpatterns = [
     # My Contests
     path('my-contests/', MyContestsView.as_view(), name='my-contests'),
     path('my-managed-contests/', MyManagedContestsView.as_view(), name='my-managed-contests'),
+    
+    # Contest Problems (Phase 6)
+    path('<slug:slug>/problems/', ContestProblemsListView.as_view(), name='contest-problems'),
+    path('<slug:slug>/problems/create/', ContestProblemCreateView.as_view(), name='create-problem'),
+    path('<slug:slug>/problems/reorder/', ReorderProblemsView.as_view(), name='reorder-problems'),
+    path('<slug:slug>/problems/stats/', ContestProblemStatsView.as_view(), name='problem-stats'),
+    path('<slug:slug>/problems/<int:pk>/', ContestProblemDetailView.as_view(), name='problem-detail'),
+    path('<slug:slug>/problems/<int:pk>/update/', ContestProblemUpdateView.as_view(), name='update-problem'),
+    path('<slug:slug>/problems/<int:pk>/delete/', ContestProblemDeleteView.as_view(), name='delete-problem'),
+    
+    # Test Cases (Phase 6)
+    path('<slug:slug>/problems/<int:pk>/test-cases/', ContestProblemTestCasesView.as_view(), name='test-cases'),
+    path('<slug:slug>/problems/<int:pk>/test-cases/create/', ContestTestCaseCreateView.as_view(), name='create-test-case'),
+    path('test-cases/<int:pk>/update/', ContestTestCaseUpdateView.as_view(), name='update-test-case'),
+    path('test-cases/<int:pk>/delete/', ContestTestCaseDeleteView.as_view(), name='delete-test-case'),
+    
+    # Contest Participation (Phase 7 & 8)
+    path('<slug:slug>/submit/', SubmitContestSolutionView.as_view(), name='submit-solution'),
+    path('<slug:slug>/my-dashboard/', MyContestDashboardView.as_view(), name='my-dashboard'),
+    path('<slug:slug>/my-submissions/', MyContestSubmissionsView.as_view(), name='my-contest-submissions'),
+    path('<slug:slug>/leaderboard/', ContestLeaderboardView.as_view(), name='leaderboard'),
+    path('<slug:slug>/leaderboard/detailed/', DetailedLeaderboardView.as_view(), name='detailed-leaderboard'),
+    path('submissions/<int:pk>/', ContestSubmissionDetailView.as_view(), name='contest-submission-detail'),
 ]

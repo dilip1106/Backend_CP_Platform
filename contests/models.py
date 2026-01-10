@@ -189,3 +189,9 @@ class ContestAnnouncement(models.Model):
     
     def __str__(self):
         return f"{self.contest.title} - {self.title}"
+
+
+# Import contest problem models
+from .contest_problem_models import ContestProblem, ContestTestCase
+# Import contest submission models
+from .contest_submission_models import ContestSubmission, ContestParticipant, ProblemSolveStatus

@@ -1,5 +1,14 @@
 from django.contrib import admin
 from .models import Contest, ContestRegistration, ContestAnnouncement
+from .contest_problem_models import ContestProblem, ContestTestCase
+from .contest_submission_models import ContestSubmission, ContestParticipant, ProblemSolveStatus
+
+
+class ContestTestCaseInline(admin.TabularInline):
+    """Inline admin for contest test cases"""
+    model = ContestTestCase
+    extra = 1
+    fields = ['test_type', 'input_data', 'expected_output', 'order', 'is_active']
 
 
 @admin.register(Contest)
@@ -55,3 +64,71 @@ class ContestAnnouncementAdmin(admin.ModelAdmin):
     list_filter = ['created_at', 'contest']
     search_fields = ['title', 'content', 'contest__title']
     date_hierarchy = 'created_at'
+
+
+@admin.register(ContestProblem)
+class ContestProblemAdmin(admin.ModelAdmin):
+    """Admin for ContestProblem model"""
+    list_display = [
+        'title', 'contest', 'difficulty', 'points', 'order',
+        'total_submissions', 'acceptance_rate', 'is_active'
+    ]
+    list_filter = ['difficulty', 'is_active', 'contest']
+    search_fields = ['title', 'description', 'contest__title']
+    readonly_fields = ['total_submissions', 'accepted_submissions', 'total_solved', 'acceptance_rate']
+    inlines = [ContestTestCaseInline]
+    
+    fieldsets = (
+        ('Contest', {
+            'fields': ('contest', 'order')
+        }),
+        ('Basic Information', {
+            'fields': ('title', 'description', 'difficulty', 'points')
+        }),
+        ('Problem Details', {
+            'fields': ('constraints', 'input_format', 'output_format', 'examples')
+        }),
+        ('Limits', {
+            'fields': ('time_limit', 'memory_limit')
+        }),
+        ('Statistics', {
+            'fields': ('total_submissions', 'accepted_submissions', 'acceptance_rate', 'total_solved')
+        }),
+        ('Metadata', {
+            'fields': ('created_by', 'is_active', 'created_at', 'updated_at')
+        }),
+    )
+
+
+@admin.register(ContestTestCase)
+class ContestTestCaseAdmin(admin.ModelAdmin):
+    """Admin for ContestTestCase model"""
+    list_display = ['problem', 'test_type', 'order', 'is_active', 'created_at']
+    list_filter = ['test_type', 'is_active', 'created_at']
+    search_fields = ['problem__title']
+
+
+@admin.register(ContestSubmission)
+class ContestSubmissionAdmin(admin.ModelAdmin):
+    """Admin for ContestSubmission model"""
+    list_display = ['user', 'contest', 'problem', 'verdict', 'language', 'submitted_at']
+    list_filter = ['verdict', 'language', 'contest', 'submitted_at']
+    search_fields = ['user__username', 'problem__title', 'contest__title']
+    readonly_fields = ['submitted_at']
+
+
+@admin.register(ContestParticipant)
+class ContestParticipantAdmin(admin.ModelAdmin):
+    """Admin for ContestParticipant model"""
+    list_display = ['user', 'contest', 'rank', 'total_score', 'problems_solved', 'total_time']
+    list_filter = ['contest']
+    search_fields = ['user__username', 'contest__title']
+    readonly_fields = ['created_at', 'updated_at']
+
+
+@admin.register(ProblemSolveStatus)
+class ProblemSolveStatusAdmin(admin.ModelAdmin):
+    """Admin for ProblemSolveStatus model"""
+    list_display = ['participant', 'problem', 'status', 'score', 'attempts', 'solve_time']
+    list_filter = ['status']
+    search_fields = ['participant__user__username', 'problem__title']
