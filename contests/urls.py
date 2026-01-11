@@ -61,6 +61,12 @@ urlpatterns = [
     # Contest CRUD (SuperUser)
     path('', ContestListView.as_view(), name='contest-list'),
     path('create/', ContestCreateView.as_view(), name='contest-create'),
+
+    # My Contests
+    path('my-contests/', MyContestsView.as_view(), name='my-contests'),
+    path('my-managed-contests/', MyManagedContestsView.as_view(), name='my-managed-contests'),
+    
+    
     path('<slug:slug>/', ContestDetailView.as_view(), name='contest-detail'),
     path('<slug:slug>/update/', ContestUpdateView.as_view(), name='contest-update'),
     path('<slug:slug>/delete/', ContestDeleteView.as_view(), name='contest-delete'),
@@ -79,9 +85,6 @@ urlpatterns = [
     path('<slug:slug>/announcements/', ContestAnnouncementsView.as_view(), name='announcements'),
     path('<slug:slug>/announcements/create/', CreateAnnouncementView.as_view(), name='create-announcement'),
     
-    # My Contests
-    path('my-contests/', MyContestsView.as_view(), name='my-contests'),
-    path('my-managed-contests/', MyManagedContestsView.as_view(), name='my-managed-contests'),
     
     # Contest Problems (Phase 6)
     path('<slug:slug>/problems/', ContestProblemsListView.as_view(), name='contest-problems'),
