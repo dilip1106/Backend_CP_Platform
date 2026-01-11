@@ -19,9 +19,229 @@ from .serializers import (
 from .judge0_service import Judge0Service
 
 
+class RunCodeView(views.APIView):
+    """
+    Run code against sample test cases only (no verdict saved)
+    POST /api/submissions/run/
+    Body: {
+        "problem_slug": "two-sum",
+        "code": "...",
+        "language": "PYTHON"
+    }
+    
+    Response: {
+        "test_results": [
+            {
+                "test_case_id": 1,
+                "test_order": 0,
+                "input": "...",
+                "expected_output": "...",
+                "actual_output": "...",
+                "status": "ACCEPTED|WRONG_ANSWER|RUNTIME_ERROR|TIME_LIMIT_EXCEEDED",
+                "execution_time": 125,
+                "memory_used": 5120,
+                "error_message": ""
+            }
+        ],
+        "compilation_error": null,
+        "all_passed": true
+    }
+    """
+    permission_classes = [IsAuthenticated, IsNotBanned]
+    serializer_class = SubmissionCreateSerializer
+    
+    @extend_schema(
+        request=SubmissionCreateSerializer,
+        responses={
+            200: {
+                'type': 'object',
+                'properties': {
+                    'test_results': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'test_case_id': {'type': 'integer'},
+                                'test_order': {'type': 'integer'},
+                                'input': {'type': 'string'},
+                                'expected_output': {'type': 'string'},
+                                'actual_output': {'type': 'string'},
+                                'status': {'type': 'string'},
+                                'execution_time': {'type': 'integer'},
+                                'memory_used': {'type': 'integer'},
+                                'error_message': {'type': 'string'}
+                            }
+                        }
+                    },
+                    'compilation_error': {'type': 'string', 'nullable': True},
+                    'all_passed': {'type': 'boolean'}
+                }
+            },
+            400: OpenApiResponse(description='Bad Request'),
+            404: OpenApiResponse(description='Problem Not Found'),
+        },
+        description='Run code against sample test cases only. Verdict is not saved to database.',
+        summary='Run Code (Sample Test Cases Only)'
+    )
+    def post(self, request):
+        serializer = SubmissionCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        problem_slug = serializer.validated_data['problem_slug']
+        code = serializer.validated_data['code']
+        language = serializer.validated_data['language']
+        
+        # Get problem
+        try:
+            problem = Problem.objects.get(slug=problem_slug, is_active=True)
+        except Problem.DoesNotExist:
+            return Response(
+                {'error': 'Problem not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get only SAMPLE test cases
+        test_cases = problem.test_cases.filter(
+            is_active=True,
+            test_type='SAMPLE'  # Only sample test cases
+        ).order_by('order')
+        
+        if not test_cases.exists():
+            return Response(
+                {'error': 'No sample test cases available for this problem'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Initialize Judge0 service
+        judge0 = Judge0Service()
+        
+        # Execute code against each sample test case
+        test_results = []
+        compilation_error = None
+        all_passed = True
+        
+        for test_case in test_cases:
+            # Execute code
+            result = judge0.execute_and_wait(
+                source_code=code,
+                language=language,
+                stdin=test_case.input_data,
+                expected_output=test_case.expected_output,
+                time_limit=problem.time_limit / 1000.0,  # Convert ms to seconds
+                memory_limit=problem.memory_limit * 1024  # Convert MB to KB
+            )
+            
+            if not result:
+                test_results.append({
+                    'test_case_id': test_case.id,
+                    'test_order': test_case.order,
+                    'input': test_case.input_data,
+                    'expected_output': test_case.expected_output,
+                    'actual_output': '',
+                    'status': 'RUNTIME_ERROR',
+                    'execution_time': 0,
+                    'memory_used': 0,
+                    'error_message': 'Failed to execute code'
+                })
+                all_passed = False
+                continue
+            
+            # Parse result
+            parsed = judge0.parse_result(result)
+            
+            # Safely get output values
+            stdout = parsed.get('stdout')
+            actual_output = stdout.strip() if stdout else ''
+            
+            # Safely convert execution_time
+            exec_time = 0
+            try:
+                time_val = parsed.get('execution_time')
+                if time_val is not None:
+                    if isinstance(time_val, str):
+                        time_val = float(time_val.strip())
+                    exec_time = int(float(time_val) * 1000)  # Convert to ms
+            except (ValueError, TypeError):
+                exec_time = 0
+            
+            # Safely convert memory_used
+            memory_val = 0
+            try:
+                mem = parsed.get('memory_used')
+                if mem is not None:
+                    if isinstance(mem, str):
+                        mem = float(mem.strip())
+                    memory_val = int(float(mem))
+            except (ValueError, TypeError):
+                memory_val = 0
+            
+            # Get error details
+            stderr = parsed.get('stderr')
+            message = parsed.get('message')
+            error_msg = (stderr if stderr else '') or (message if message else '')
+            
+            # Determine verdict
+            verdict = parsed.get('verdict', 'INTERNAL_ERROR')
+            
+            if verdict == 'COMPILATION_ERROR':
+                compile_output = parsed.get('compile_output')
+                compilation_error = compile_output if compile_output else 'Compilation error occurred'
+                all_passed = False
+                # Add this test case result and break
+                test_results.append({
+                    'test_case_id': test_case.id,
+                    'test_order': test_case.order,
+                    'input': test_case.input_data,
+                    'expected_output': test_case.expected_output,
+                    'actual_output': '',
+                    'status': 'COMPILATION_ERROR',
+                    'execution_time': 0,
+                    'memory_used': 0,
+                    'error_message': 'Compilation error'
+                })
+                break  # Stop testing after compilation error
+            
+            # Map Judge0 verdict to our status
+            if verdict == 'ACCEPTED':
+                status_str = 'ACCEPTED'
+            elif verdict == 'WRONG_ANSWER':
+                status_str = 'WRONG_ANSWER'
+                all_passed = False
+            elif verdict == 'TIME_LIMIT_EXCEEDED':
+                status_str = 'TIME_LIMIT_EXCEEDED'
+                all_passed = False
+            elif verdict == 'RUNTIME_ERROR':
+                status_str = 'RUNTIME_ERROR'
+                all_passed = False
+            elif verdict == 'MEMORY_LIMIT_EXCEEDED':
+                status_str = 'MEMORY_LIMIT_EXCEEDED'
+                all_passed = False
+            else:
+                status_str = 'RUNTIME_ERROR'
+                all_passed = False
+            
+            test_results.append({
+                'test_case_id': test_case.id,
+                'test_order': test_case.order,
+                'input': test_case.input_data,
+                'expected_output': test_case.expected_output,
+                'actual_output': actual_output,
+                'status': status_str,
+                'execution_time': exec_time,
+                'memory_used': memory_val,
+                'error_message': error_msg
+            })
+        
+        return Response({
+            'test_results': test_results,
+            'compilation_error': compilation_error,
+            'all_passed': all_passed
+        }, status=status.HTTP_200_OK)
+
+
 class SubmissionCreateView(views.APIView):
     """
-    Submit code for a problem
+    Submit code for a problem (runs against all test cases and saves verdict)
     POST /api/submissions/submit/
     Body: {
         "problem_slug": "two-sum",
@@ -39,7 +259,7 @@ class SubmissionCreateView(views.APIView):
             400: OpenApiResponse(description='Bad Request'),
             404: OpenApiResponse(description='Problem Not Found'),
         },
-        description='Submit code for a problem. The code will be executed against all test cases.',
+        description='Submit code for a problem. The code will be executed against all test cases and verdict will be saved.',
         summary='Submit Code Solution'
     )
     
@@ -69,7 +289,7 @@ class SubmissionCreateView(views.APIView):
             verdict=Submission.Verdict.RUNNING
         )
         
-        # Get all test cases
+        # Get all test cases (both SAMPLE and HIDDEN)
         test_cases = problem.test_cases.filter(is_active=True).order_by('order')
         submission.total_test_cases = test_cases.count()
         submission.save()
@@ -316,7 +536,7 @@ class SubmissionDetailView(generics.RetrieveAPIView):
     GET /api/submissions/<pk>/
     """
     queryset = Submission.objects.all()
-    serializer_class = SubmissionDetailSerializer  # Use single serializer
+    serializer_class = SubmissionDetailSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = 'pk'
 

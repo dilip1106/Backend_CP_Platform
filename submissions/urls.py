@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    RunCodeView,
     SubmissionCreateView,
     SubmissionListView,
     SubmissionDetailView,
@@ -10,11 +11,14 @@ from .views import (
 app_name = 'submissions'
 
 urlpatterns = [
+    # Run code (sample test cases only)
+    path('run/', RunCodeView.as_view(), name='run-code'),
+    
     # User's submissions (must come before detail view to avoid conflicts)
     path('my-submissions/', MySubmissionsView.as_view(), name='my-submissions'),
     path('my-stats/', MySubmissionStatsView.as_view(), name='my-stats'),
     
-    # Submit code
+    # Submit code (all test cases, saves verdict)
     path('submit/', SubmissionCreateView.as_view(), name='submission-create'),
     
     # List submissions

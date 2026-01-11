@@ -139,7 +139,11 @@ SIMPLE_JWT = {
 }
 
 # CORS
-CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000').split(',')
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:8080",
+    "https://id-preview--29f67958-3456-4756-a950-2ff580f3a07c.lovable.app",
+]
 CORS_ALLOW_CREDENTIALS = True
 
 # API Documentation
